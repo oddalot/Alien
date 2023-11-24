@@ -8,6 +8,7 @@ import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSType
@@ -36,8 +37,7 @@ class AlienSymbolProcessor(
 ) : SymbolProcessor {
     private val moduleMap = mutableMapOf<ClassName, KSClassDeclaration>()
     private val providerMap = mutableMapOf<TypeName, ProviderData>()
-
-    val providerNameMap = mutableMapOf<TypeName, String>()
+    private val providerNameMap = mutableMapOf<TypeName, String>()
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val symbols = resolver.getSymbolsWithAnnotation("net.williamott.alien.AlienMotherShip")
@@ -105,7 +105,7 @@ class AlienSymbolProcessor(
             classDeclaration: KSClassDeclaration
         ): TypeSpec.Builder{
             logger.warn("providerMapSize: ${providerMap.size}")
-            providerMap.toOrderedList().forEach { (typeName, providerData)  ->
+            providerMap.filterAndOrderList(classDeclaration).forEach { (typeName, providerData)  ->
                 logger.warn("ordered typeName: $typeName")
                 val moduleName = providerData.moduleClass.toClassName().simpleName
                 val providerType = providerData.functionDeclaration.returnType?.toTypeName()!!
@@ -142,20 +142,27 @@ class AlienSymbolProcessor(
             return this
         }
 
-        private fun Map<TypeName, ProviderData>.toOrderedList(): List<Pair<TypeName, ProviderData>> {
+        private fun Map<TypeName, ProviderData>.filterAndOrderList(classDeclaration: KSClassDeclaration): List<Pair<TypeName, ProviderData>> {
             val providerList = mutableListOf<Pair<TypeName, ProviderData>>()
+            val modules = classDeclaration.annotations.find { it.shortName.asString() == "AlienMotherShip" }?.arguments?.first()?.value as  java.util.ArrayList<KSType>
+
+            logger.warn("modules: $modules")
             this.forEach { (typeName, providerData) ->
-                var didInsert = false
-                repeat(providerList.size) { index ->
-                    val paramTypes = providerList[index].second.functionDeclaration.parameters.map { it.type.toTypeName() }
-                    if (paramTypes.contains(typeName)) {
-                        if (!didInsert) providerList.add(index, Pair(typeName, providerData))
-                        didInsert = true
-                        return@repeat
+                logger.warn("moduleTypeName: ${providerData.moduleClass.toClassName()}")
+                if (modules.find { it.toClassName() == providerData.moduleClass.toClassName() } != null) {
+                    var didInsert = false
+                    repeat(providerList.size) { index ->
+                        val paramTypes =
+                            providerList[index].second.functionDeclaration.parameters.map { it.type.toTypeName() }
+                        if (paramTypes.contains(typeName)) {
+                            if (!didInsert) providerList.add(index, Pair(typeName, providerData))
+                            didInsert = true
+                            return@repeat
+                        }
                     }
+                    if (!didInsert) providerList.add(Pair(typeName, providerData))
+                    logger.warn("providerList: ${providerList}")
                 }
-                if (!didInsert) providerList.add(Pair(typeName, providerData))
-                logger.warn("providerList: ${providerList}")
             }
 
             return providerList
