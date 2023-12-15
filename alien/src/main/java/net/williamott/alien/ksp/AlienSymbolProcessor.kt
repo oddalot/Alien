@@ -39,6 +39,9 @@ class AlienSymbolProcessor(
     private val providerMap = mutableMapOf<TypeName, ProviderData>()
     private val providerNameMap = mutableMapOf<TypeName, String>()
 
+    private val modulePrintSet = linkedSetOf<KSClassDeclaration>()
+    private val providerPrintSet = linkedSetOf<TypeName>()
+
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val symbols = resolver.getSymbolsWithAnnotation("net.williamott.alien.AlienMotherShip")
         val moduleSymbols = resolver.getSymbolsWithAnnotation("net.williamott.alien.AlienModule")
@@ -70,7 +73,8 @@ class AlienSymbolProcessor(
                     TypeSpec.classBuilder(className)
                         .addSuperinterface(classDeclaration.toClassName())
                         .addOriginatingKSFile(classDeclaration.containingFile!!)
-                        .addComponentModuleFields(classDeclaration)
+                        .buildProviderData(classDeclaration)
+                        //.addComponentModuleFields(classDeclaration)
                         .addComponentProviderFields(classDeclaration)
                         .addComponentGetterFunctions(classDeclaration)
                         .build()
@@ -174,10 +178,44 @@ class AlienSymbolProcessor(
             classDeclaration.getDeclaredFunctions().forEach { componentFunction ->
                 val functionReturnType = componentFunction.returnType?.toTypeName()!!
                 val providerName = providerNameMap[functionReturnType]
+
                 funSpecs += FunSpec.builder(componentFunction.simpleName.asString()).returns(functionReturnType).addStatement(
                     "return ${providerName}.get()"
                 ).addModifiers(KModifier.OVERRIDE).build()
             }
+
+            return this
+        }
+
+        private fun TypeSpec.Builder.buildProviderData(
+            classDeclaration: KSClassDeclaration
+        ): TypeSpec.Builder{
+            classDeclaration.getDeclaredFunctions().forEach { componentFunction ->
+                val functionReturnType = componentFunction.returnType?.toTypeName()!!
+                recurseThroughParams(functionReturnType)
+            }
+
+            modulePrintSet.forEach { moduleClassDeclaration ->
+                logger.warn("modCDWarn: $moduleClassDeclaration")
+                propertySpecs += PropertySpec.builder(
+                    moduleClassDeclaration.simpleName.asString().replaceFirstChar { it.lowercaseChar() }, moduleClassDeclaration.toClassName()
+                ).initializer("${moduleClassDeclaration.toClassName().simpleName}()").build()
+            }
+
+            return this
+        }
+
+        private fun TypeSpec.Builder.recurseThroughParams(
+            paramTypeName: TypeName
+        ): TypeSpec.Builder{
+            val providerData = providerMap[paramTypeName]
+            providerData?.functionDeclaration?.parameters?.forEach { ksValueParameter ->
+                val typeName = ksValueParameter.type.toTypeName()
+                recurseThroughParams(typeName)
+            }
+
+            providerData?.moduleClass?.let { moduleClass -> modulePrintSet.add(moduleClass) }
+            providerPrintSet.add(paramTypeName)
 
             return this
         }
