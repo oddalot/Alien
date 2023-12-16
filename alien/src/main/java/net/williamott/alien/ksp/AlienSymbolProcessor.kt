@@ -8,10 +8,8 @@ import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.symbol.KSAnnotated
-import com.google.devtools.ksp.symbol.KSAnnotation
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSVisitorVoid
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
@@ -41,6 +39,7 @@ class AlienSymbolProcessor(
 
     private val modulePrintSet = linkedSetOf<KSClassDeclaration>()
     private val providerPrintSet = linkedSetOf<TypeName>()
+    private val functionPrintSet = linkedSetOf<ProviderFunctionData>()
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val symbols = resolver.getSymbolsWithAnnotation("net.williamott.alien.AlienMotherShip")
@@ -74,112 +73,74 @@ class AlienSymbolProcessor(
                         .addSuperinterface(classDeclaration.toClassName())
                         .addOriginatingKSFile(classDeclaration.containingFile!!)
                         .buildProviderData(classDeclaration)
-                        //.addComponentModuleFields(classDeclaration)
-                        .addComponentProviderFields(classDeclaration)
-                        .addComponentGetterFunctions(classDeclaration)
                         .build()
                 )
                 .build()
             file.writeTo(codeGenerator = codeGenerator, aggregating = false)
         }
 
-        private fun TypeSpec.Builder.addComponentModuleFields(
+        private fun TypeSpec.Builder.buildProviderData(
             classDeclaration: KSClassDeclaration
-        ): TypeSpec.Builder{
-            classDeclaration.annotations.find { it.shortName.asString() == "AlienMotherShip" }?.arguments?.forEach { ksValueArgument ->
-                val module = ksValueArgument.value as java.util.ArrayList<KSType>
-                module.forEach { ksType ->
-                    val moduleClassName = ksType.toClassName()
-                    logger.warn("maoduleClassName: $moduleClassName")
-                    val moduleClassDeclaration = moduleMap[moduleClassName]
-                    moduleClassDeclaration?.let { classDeclaration ->
-                        logger.warn("modCD: $classDeclaration")
-                        propertySpecs += PropertySpec.builder(
-                            classDeclaration.simpleName.asString().replaceFirstChar { it.lowercaseChar() }, classDeclaration.toClassName()
-                        ).initializer("${classDeclaration.toClassName().simpleName}()")
-                            .build()
-                    }
-                }
-            }
+        ): TypeSpec.Builder {
+            modulePrintSet.clear()
+            providerPrintSet.clear()
+            functionPrintSet.clear()
 
-            return this
-        }
-
-        private fun TypeSpec.Builder.addComponentProviderFields(
-            classDeclaration: KSClassDeclaration
-        ): TypeSpec.Builder{
-            logger.warn("providerMapSize: ${providerMap.size}")
-            providerMap.filterAndOrderList(classDeclaration).forEach { (typeName, providerData)  ->
-                logger.warn("ordered typeName: $typeName")
-                val moduleName = providerData.moduleClass.toClassName().simpleName
-                val providerType = providerData.functionDeclaration.returnType?.toTypeName()!!
-                val functionName = providerData.functionDeclaration.simpleName.getShortName()
-                val classTypeName = Provider::class.asTypeName().plusParameter(providerType)
-                val classNameString = "${moduleName}_${functionName}Provider"
-                val tempName = functionName.replaceFirstChar { it.lowercaseChar() }
-                val providerName = "${tempName}Provider"
-                providerNameMap[typeName] = providerName
-                val expression = buildString {
-                    append(classNameString)
-                    append("(")
-                    append(moduleName.replaceFirstChar { it.lowercaseChar() })
-                    if (providerData.functionDeclaration.parameters.isNotEmpty()) {
-                        append(", ")
-                    }
-                    providerData.functionDeclaration.parameters.forEachIndexed { index, ksValueParameter ->
-                        val paramTempName = ksValueParameter.name?.getShortName()
-                        val paramName = providerNameMap[ksValueParameter.type.toTypeName()]
-                        append(paramName)
-                        if (index != providerData.functionDeclaration.parameters.size - 1) {
-                            append(", ")
-                        }
-                    }
-                    append(")")
-                }
-
-                propertySpecs += PropertySpec.builder(
-                    providerName, classTypeName
-                ).initializer(expression)
-                    .build()
-            }
-
-            return this
-        }
-
-        private fun Map<TypeName, ProviderData>.filterAndOrderList(classDeclaration: KSClassDeclaration): List<Pair<TypeName, ProviderData>> {
-            val providerList = mutableListOf<Pair<TypeName, ProviderData>>()
-            val modules = classDeclaration.annotations.find { it.shortName.asString() == "AlienMotherShip" }?.arguments?.first()?.value as  java.util.ArrayList<KSType>
-
-            logger.warn("modules: $modules")
-            this.forEach { (typeName, providerData) ->
-                logger.warn("moduleTypeName: ${providerData.moduleClass.toClassName()}")
-                if (modules.find { it.toClassName() == providerData.moduleClass.toClassName() } != null) {
-                    var didInsert = false
-                    repeat(providerList.size) { index ->
-                        val paramTypes =
-                            providerList[index].second.functionDeclaration.parameters.map { it.type.toTypeName() }
-                        if (paramTypes.contains(typeName)) {
-                            if (!didInsert) providerList.add(index, Pair(typeName, providerData))
-                            didInsert = true
-                            return@repeat
-                        }
-                    }
-                    if (!didInsert) providerList.add(Pair(typeName, providerData))
-                    logger.warn("providerList: ${providerList}")
-                }
-            }
-
-            return providerList
-        }
-
-        private fun TypeSpec.Builder.addComponentGetterFunctions(
-            classDeclaration: KSClassDeclaration
-        ): TypeSpec.Builder{
             classDeclaration.getDeclaredFunctions().forEach { componentFunction ->
                 val functionReturnType = componentFunction.returnType?.toTypeName()!!
-                val providerName = providerNameMap[functionReturnType]
+                val functionName = componentFunction.simpleName.getShortName()
+                functionPrintSet.add(ProviderFunctionData(functionName, functionReturnType))
+                recurseThroughParams(functionReturnType)
+            }
 
-                funSpecs += FunSpec.builder(componentFunction.simpleName.asString()).returns(functionReturnType).addStatement(
+            modulePrintSet.forEach { moduleClassDeclaration ->
+                logger.warn("modCDWarn: $moduleClassDeclaration")
+                propertySpecs += PropertySpec.builder(
+                    moduleClassDeclaration.simpleName.asString()
+                        .replaceFirstChar { it.lowercaseChar() },
+                    moduleClassDeclaration.toClassName()
+                ).initializer("${moduleClassDeclaration.toClassName().simpleName}()").build()
+            }
+
+            providerPrintSet.forEach { typeName ->
+                logger.warn("ordered typeName: $typeName")
+                providerMap[typeName]?.let { providerData ->
+                    val moduleName = providerData.moduleClass.toClassName().simpleName
+                    val providerType = providerData.functionDeclaration.returnType?.toTypeName()!!
+                    val functionName = providerData.functionDeclaration.simpleName.getShortName()
+                    val classTypeName = Provider::class.asTypeName().plusParameter(providerType)
+                    val classNameString = "${moduleName}_${functionName}Provider"
+                    val tempName = functionName.replaceFirstChar { it.lowercaseChar() }
+                    val providerName = "${tempName}Provider"
+                    providerNameMap[typeName] = providerName
+                    val expression = buildString {
+                        append(classNameString)
+                        append("(")
+                        append(moduleName.replaceFirstChar { it.lowercaseChar() })
+                        if (providerData.functionDeclaration.parameters.isNotEmpty()) {
+                            append(", ")
+                        }
+                        providerData.functionDeclaration.parameters.forEachIndexed { index, ksValueParameter ->
+                            val paramTempName = ksValueParameter.name?.getShortName()
+                            val paramName = providerNameMap[ksValueParameter.type.toTypeName()]
+                            append(paramName)
+                            if (index != providerData.functionDeclaration.parameters.size - 1) {
+                                append(", ")
+                            }
+                        }
+                        append(")")
+                    }
+
+                    propertySpecs += PropertySpec.builder(
+                        providerName, classTypeName
+                    ).initializer(expression)
+                        .build()
+                }
+            }
+
+            functionPrintSet.forEach { (functionName, typeName) ->
+                val providerName = providerNameMap[typeName]
+                funSpecs += FunSpec.builder(functionName).returns(typeName).addStatement(
                     "return ${providerName}.get()"
                 ).addModifiers(KModifier.OVERRIDE).build()
             }
@@ -187,27 +148,9 @@ class AlienSymbolProcessor(
             return this
         }
 
-        private fun TypeSpec.Builder.buildProviderData(
-            classDeclaration: KSClassDeclaration
-        ): TypeSpec.Builder{
-            classDeclaration.getDeclaredFunctions().forEach { componentFunction ->
-                val functionReturnType = componentFunction.returnType?.toTypeName()!!
-                recurseThroughParams(functionReturnType)
-            }
-
-            modulePrintSet.forEach { moduleClassDeclaration ->
-                logger.warn("modCDWarn: $moduleClassDeclaration")
-                propertySpecs += PropertySpec.builder(
-                    moduleClassDeclaration.simpleName.asString().replaceFirstChar { it.lowercaseChar() }, moduleClassDeclaration.toClassName()
-                ).initializer("${moduleClassDeclaration.toClassName().simpleName}()").build()
-            }
-
-            return this
-        }
-
         private fun TypeSpec.Builder.recurseThroughParams(
             paramTypeName: TypeName
-        ): TypeSpec.Builder{
+        ): TypeSpec.Builder {
             val providerData = providerMap[paramTypeName]
             providerData?.functionDeclaration?.parameters?.forEach { ksValueParameter ->
                 val typeName = ksValueParameter.type.toTypeName()
@@ -225,52 +168,90 @@ class AlienSymbolProcessor(
         @OptIn(KspExperimental::class)
         override fun visitClassDeclaration(classDeclaration: KSClassDeclaration, data: Unit) {
             moduleMap[classDeclaration.toClassName()] = classDeclaration
-            classDeclaration.getDeclaredFunctions().filter { it.isAnnotationPresent(AlienProvides::class) }.forEach { functionDeclaration ->
-                val packageName = classDeclaration.containingFile?.packageName?.asString()
-                val returnType = functionDeclaration.returnType?.toTypeName()
-                val functionName = functionDeclaration.simpleName.getShortName()
-                logger.warn("returnType print: $returnType")
-                providerMap[returnType!!] = ProviderData(functionDeclaration, classDeclaration)
-                val className = "${classDeclaration.toClassName().simpleName}_${functionName}Provider"
-                val moduleName = classDeclaration.toClassName()
-                val moduleNameLowerCase = moduleName.toString().substringAfterLast(".").replaceFirstChar { it.lowercaseChar() }
+            classDeclaration.getDeclaredFunctions()
+                .filter { it.isAnnotationPresent(AlienProvides::class) }
+                .forEach { functionDeclaration ->
+                    val packageName = classDeclaration.containingFile?.packageName?.asString()
+                    val returnType = functionDeclaration.returnType?.toTypeName()
+                    val functionName = functionDeclaration.simpleName.getShortName()
+                    logger.warn("returnType print: $returnType")
+                    providerMap[returnType!!] = ProviderData(functionDeclaration, classDeclaration)
+                    val className =
+                        "${classDeclaration.toClassName().simpleName}_${functionName}Provider"
+                    val moduleName = classDeclaration.toClassName()
+                    val moduleNameLowerCase = moduleName.toString().substringAfterLast(".")
+                        .replaceFirstChar { it.lowercaseChar() }
 
-                val file = FileSpec.builder(packageName!!, className)
-                    .addType(
-                        TypeSpec.classBuilder(className)
-                            .addOriginatingKSFile(classDeclaration.containingFile!!)
-                            .primaryConstructor(FunSpec.constructorBuilder().addAllParameters(moduleNameLowerCase, moduleName, functionDeclaration).build())
-                            .addSuperinterface(
-                                Provider::class.asTypeName().plusParameter(returnType)
-                            )
-                            .addAllProperties(moduleNameLowerCase, moduleName, functionDeclaration)
-                            .addModuleGetFunction(returnType, moduleNameLowerCase, functionDeclaration)
-                            .build()
-                    )
-                    .build()
-                file.writeTo(codeGenerator = codeGenerator, aggregating = false)
-            }
+                    val file = FileSpec.builder(packageName!!, className)
+                        .addType(
+                            TypeSpec.classBuilder(className)
+                                .addOriginatingKSFile(classDeclaration.containingFile!!)
+                                .primaryConstructor(
+                                    FunSpec.constructorBuilder().addAllParameters(
+                                        moduleNameLowerCase,
+                                        moduleName,
+                                        functionDeclaration
+                                    ).build()
+                                )
+                                .addSuperinterface(
+                                    Provider::class.asTypeName().plusParameter(returnType)
+                                )
+                                .addAllProperties(
+                                    moduleNameLowerCase,
+                                    moduleName,
+                                    functionDeclaration
+                                )
+                                .addModuleGetFunction(
+                                    returnType,
+                                    moduleNameLowerCase,
+                                    functionDeclaration
+                                )
+                                .build()
+                        )
+                        .build()
+                    file.writeTo(codeGenerator = codeGenerator, aggregating = false)
+                }
         }
 
-        private fun FunSpec.Builder.addAllParameters(moduleNameLowerCase: String, moduleName: ClassName, functionDeclaration: KSFunctionDeclaration): FunSpec.Builder {
+        private fun FunSpec.Builder.addAllParameters(
+            moduleNameLowerCase: String,
+            moduleName: ClassName,
+            functionDeclaration: KSFunctionDeclaration
+        ): FunSpec.Builder {
             addParameter(moduleNameLowerCase, moduleName)
             functionDeclaration.parameters.forEach { ksValueParameter ->
-                val providerTypeName = ksValueParameter.type.toTypeName().toString().substringAfterLast(".")
-                val propertyName = "${providerTypeName.replaceFirstChar { it.lowercaseChar() }}Provider"
-                val className = Provider::class.asTypeName().plusParameter(ClassName(moduleName.packageName, providerTypeName))
+                val providerTypeName =
+                    ksValueParameter.type.toTypeName().toString().substringAfterLast(".")
+                val propertyName =
+                    "${providerTypeName.replaceFirstChar { it.lowercaseChar() }}Provider"
+                val className = Provider::class.asTypeName()
+                    .plusParameter(ClassName(moduleName.packageName, providerTypeName))
                 addParameter(propertyName, className)
             }
 
             return this
         }
 
-        private fun TypeSpec.Builder.addAllProperties(moduleNameLowerCase: String, moduleName: ClassName, functionDeclaration: KSFunctionDeclaration): TypeSpec.Builder {
-            addProperty(PropertySpec.builder(moduleNameLowerCase, moduleName).initializer(moduleNameLowerCase).addModifiers(KModifier.PRIVATE).build())
+        private fun TypeSpec.Builder.addAllProperties(
+            moduleNameLowerCase: String,
+            moduleName: ClassName,
+            functionDeclaration: KSFunctionDeclaration
+        ): TypeSpec.Builder {
+            addProperty(
+                PropertySpec.builder(moduleNameLowerCase, moduleName)
+                    .initializer(moduleNameLowerCase).addModifiers(KModifier.PRIVATE).build()
+            )
             functionDeclaration.parameters.forEach { ksValueParameter ->
-                val providerTypeName = ksValueParameter.type.toTypeName().toString().substringAfterLast(".")
-                val propertyName = "${providerTypeName.replaceFirstChar { it.lowercaseChar() }}Provider"
-                val className = Provider::class.asTypeName().plusParameter(ClassName(moduleName.packageName, providerTypeName))
-                addProperty(PropertySpec.builder(propertyName, className).initializer(propertyName).addModifiers(KModifier.PRIVATE).build())
+                val providerTypeName =
+                    ksValueParameter.type.toTypeName().toString().substringAfterLast(".")
+                val propertyName =
+                    "${providerTypeName.replaceFirstChar { it.lowercaseChar() }}Provider"
+                val className = Provider::class.asTypeName()
+                    .plusParameter(ClassName(moduleName.packageName, providerTypeName))
+                addProperty(
+                    PropertySpec.builder(propertyName, className).initializer(propertyName)
+                        .addModifiers(KModifier.PRIVATE).build()
+                )
             }
 
             return this
@@ -280,7 +261,7 @@ class AlienSymbolProcessor(
             typeName: TypeName,
             moduleNameLowerCase: String,
             functionDeclaration: KSFunctionDeclaration
-        ): TypeSpec.Builder{
+        ): TypeSpec.Builder {
             val expression = buildString {
                 append("return ")
                 append(moduleNameLowerCase)
@@ -288,7 +269,9 @@ class AlienSymbolProcessor(
                 append(functionDeclaration.simpleName.getShortName())
                 append("(")
                 functionDeclaration.parameters.forEachIndexed { index, ksValueParameter ->
-                    val paramTempName = ksValueParameter.type.toTypeName().toString().substringAfterLast(".").replaceFirstChar { it.lowercaseChar() }
+                    val paramTempName =
+                        ksValueParameter.type.toTypeName().toString().substringAfterLast(".")
+                            .replaceFirstChar { it.lowercaseChar() }
                     val paramName = "${paramTempName}Provider.get()"
                     append(paramName)
                     if (index != functionDeclaration.parameters.size - 1) {
@@ -309,5 +292,10 @@ class AlienSymbolProcessor(
     private data class ProviderData(
         val functionDeclaration: KSFunctionDeclaration,
         val moduleClass: KSClassDeclaration
+    )
+
+    private data class ProviderFunctionData(
+        val functionName: String,
+        val returnType: TypeName
     )
 }
