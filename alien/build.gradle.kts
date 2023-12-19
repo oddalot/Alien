@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm")
+    id("com.vanniktech.maven.publish") version "0.25.3"
 }
 
 java {
@@ -11,4 +12,37 @@ dependencies {
     implementation("com.google.devtools.ksp:symbol-processing-api:1.9.10-1.0.13")
     implementation("com.squareup:kotlinpoet:1.11.0")
     implementation("com.squareup:kotlinpoet-ksp:1.11.0")
+}
+
+group = "net.williamott"
+version = "0.1"
+
+mavenPublishing {
+    coordinates("net.williamott", "alien", "0.1")
+
+    pom {
+        name.set("Alien Dependency Injection")
+        description.set("A simple dependency injection library for Kotlin.")
+        inceptionYear.set("2023")
+        url.set("https://github.com/oddalot/Alien")
+        licenses {
+            license {
+                name.set("The Apache License, Version 2.0")
+                url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+                distribution.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+            }
+        }
+        developers {
+            developer {
+                id.set("oddalot")
+                name.set("William Ott")
+                url.set("https://github.com/oddalot")
+            }
+        }
+        scm {
+            url.set("https://github.com/oddalot/Alien/")
+            connection.set("scm:git:git://github.com/oddalot/Alien.git")
+            developerConnection.set("scm:git:ssh://git@github.com/oddalot/Alien.git")
+        }
+    }
 }
