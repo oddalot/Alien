@@ -18,6 +18,8 @@ group = "net.williamott"
 version = "0.1"
 
 mavenPublishing {
+    publishToMavenCentral(com.vanniktech.maven.publish.SonatypeHost.DEFAULT)
+
     coordinates("net.williamott", "alien", "0.1")
 
     pom {
