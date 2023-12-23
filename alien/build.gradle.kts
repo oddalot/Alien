@@ -16,7 +16,7 @@ dependencies {
 
 group = "net.williamott"
 version = "0.1"
-git
+
 mavenPublishing {
     publishToMavenCentral(com.vanniktech.maven.publish.SonatypeHost.S01)
 
