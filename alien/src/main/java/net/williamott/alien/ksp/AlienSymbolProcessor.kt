@@ -65,7 +65,7 @@ class AlienSymbolProcessor(
 
         private fun buildComponent(classDeclaration: KSClassDeclaration) {
             val packageName = classDeclaration.containingFile?.packageName?.asString()
-            val className = "AlienMotherShip${classDeclaration.toClassName().simpleName}"
+            val className = "Alien${classDeclaration.toClassName().simpleName}"
 
             val file = FileSpec.builder(packageName!!, className)
                 .addType(
