@@ -11,11 +11,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import net.williamott.aliensampleproject.di.AlienMotherShipPlanetShip
+import net.williamott.aliensampleproject.di.AlienPlanetShip
 import net.williamott.aliensampleproject.ui.theme.AlienSampleProjectTheme
 
 class MainActivity : ComponentActivity() {
-    private val motherShip = AlienMotherShipPlanetShip()
+    private val motherShip = AlienPlanetShip()
     private val animal = motherShip.getAnimal()
     private val water = motherShip.getWater()
 

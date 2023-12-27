@@ -10,6 +10,8 @@ import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.google.devtools.ksp.symbol.KSName
+import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSVisitorVoid
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
@@ -25,6 +27,7 @@ import com.squareup.kotlinpoet.ksp.addOriginatingKSFile
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.writeTo
+import net.williamott.alien.AlienMotherShip
 import net.williamott.alien.AlienProvides
 import net.williamott.alien.Provider
 
@@ -40,6 +43,7 @@ class AlienSymbolProcessor(
     private val modulePrintSet = linkedSetOf<KSClassDeclaration>()
     private val providerPrintSet = linkedSetOf<TypeName>()
     private val functionPrintSet = linkedSetOf<ProviderFunctionData>()
+    private val componentProviderMap = mutableMapOf<TypeName, ProviderData>()
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val symbols = resolver.getSymbolsWithAnnotation("net.williamott.alien.AlienMotherShip")
@@ -85,6 +89,18 @@ class AlienSymbolProcessor(
             modulePrintSet.clear()
             providerPrintSet.clear()
             functionPrintSet.clear()
+            componentProviderMap.clear()
+
+            classDeclaration.annotations.forEach {
+                logger.warn("componentAnnotation: $it")
+            }
+
+            classDeclaration.annotations.find { it.shortName.asString() == "AlienMotherShip" }?.arguments?.forEach { ksValueArgument ->
+                val moduleList = ksValueArgument.value as java.util.ArrayList<KSType>
+                moduleList.forEach { ksType ->
+                    componentModuleSet.add(ksType.toClassName())
+                }
+            }
 
             classDeclaration.getDeclaredFunctions().forEach { componentFunction ->
                 val functionReturnType = componentFunction.returnType?.toTypeName()!!
@@ -157,7 +173,9 @@ class AlienSymbolProcessor(
                 recurseThroughParams(typeName)
             }
 
-            providerData?.moduleClass?.let { moduleClass -> modulePrintSet.add(moduleClass) }
+            providerData?.moduleClass?.let {
+                moduleClass -> modulePrintSet.add(moduleClass)
+            }
             providerPrintSet.add(paramTypeName)
 
             return this
