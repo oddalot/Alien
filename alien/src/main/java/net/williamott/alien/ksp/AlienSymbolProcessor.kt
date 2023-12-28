@@ -36,8 +36,7 @@ class AlienSymbolProcessor(
     val codeGenerator: CodeGenerator,
     val logger: KSPLogger
 ) : SymbolProcessor {
-    private val moduleMap = mutableMapOf<ClassName, KSClassDeclaration>()
-    private val providerMap = mutableMapOf<TypeName, ProviderData>()
+    private val moduleMap = mutableMapOf<ClassName, MutableMap<TypeName, ProviderData>>()
     private val providerNameMap = mutableMapOf<TypeName, String>()
 
     private val modulePrintSet = linkedSetOf<KSClassDeclaration>()
@@ -98,7 +97,9 @@ class AlienSymbolProcessor(
             classDeclaration.annotations.find { it.shortName.asString() == "AlienMotherShip" }?.arguments?.forEach { ksValueArgument ->
                 val moduleList = ksValueArgument.value as java.util.ArrayList<KSType>
                 moduleList.forEach { ksType ->
-                    componentModuleSet.add(ksType.toClassName())
+                    moduleMap[ksType.toClassName()]?.forEach { (typeName, providerData) ->
+                        componentProviderMap[typeName] = providerData
+                    }
                 }
             }
 
@@ -120,7 +121,7 @@ class AlienSymbolProcessor(
 
             providerPrintSet.forEach { typeName ->
                 logger.warn("ordered typeName: $typeName")
-                providerMap[typeName]?.let { providerData ->
+                componentProviderMap[typeName]?.let { providerData ->
                     val moduleName = providerData.moduleClass.toClassName().simpleName
                     val providerType = providerData.functionDeclaration.returnType?.toTypeName()!!
                     val functionName = providerData.functionDeclaration.simpleName.getShortName()
@@ -167,7 +168,7 @@ class AlienSymbolProcessor(
         private fun TypeSpec.Builder.recurseThroughParams(
             paramTypeName: TypeName
         ): TypeSpec.Builder {
-            val providerData = providerMap[paramTypeName]
+            val providerData = componentProviderMap[paramTypeName]
             providerData?.functionDeclaration?.parameters?.forEach { ksValueParameter ->
                 val typeName = ksValueParameter.type.toTypeName()
                 recurseThroughParams(typeName)
@@ -185,7 +186,8 @@ class AlienSymbolProcessor(
     private inner class ModuleSymbolVisitor : KSVisitorVoid() {
         @OptIn(KspExperimental::class)
         override fun visitClassDeclaration(classDeclaration: KSClassDeclaration, data: Unit) {
-            moduleMap[classDeclaration.toClassName()] = classDeclaration
+            val providerMap = mutableMapOf<TypeName, ProviderData>()
+            moduleMap[classDeclaration.toClassName()] = providerMap
             classDeclaration.getDeclaredFunctions()
                 .filter { it.isAnnotationPresent(AlienProvides::class) }
                 .forEach { functionDeclaration ->
