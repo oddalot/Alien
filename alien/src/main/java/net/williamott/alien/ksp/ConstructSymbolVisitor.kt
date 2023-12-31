@@ -25,7 +25,7 @@ import net.williamott.alien.Provider
 
 
 class ConstructSymbolVisitor(
-    private val constructMap: MutableMap<ClassName, MutableMap<TypeName, ConstructData>>,
+    private val constructMap: MutableMap<TypeName, ConstructData>,
     private val codeGenerator: CodeGenerator,
     private val logger: KSPLogger,
 ) : KSVisitorVoid() {
@@ -37,6 +37,8 @@ class ConstructSymbolVisitor(
         logger.warn("returnType print: $returnType")
         val typeName = (function.parent as KSClassDeclaration).toClassName().simpleName
         val className = "Construct_${typeName}Provider"
+
+        constructMap[returnType] = ConstructData(functionDeclaration = function)
 
         val file = FileSpec.builder(packageName!!, className)
             .addType(

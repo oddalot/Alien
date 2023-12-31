@@ -23,7 +23,8 @@ import com.squareup.kotlinpoet.ksp.writeTo
 import net.williamott.alien.Provider
 
 class ComponentSymbolVisitor(
-    private val moduleMap: MutableMap<ClassName, MutableMap<TypeName, ProviderData>>,
+    private val moduleMap: Map<ClassName, MutableMap<TypeName, ProviderData>>,
+    private val constructMap: Map<TypeName, ConstructData>,
     private val codeGenerator: CodeGenerator,
     private val logger: KSPLogger,
 ) : KSVisitorVoid() {

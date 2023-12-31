@@ -7,11 +7,6 @@ import net.williamott.alien.AlienProvides
 @AlienModule
 class Module1 {
     @AlienProvides
-    fun provideSun(): Sun {
-        return Sun()
-    }
-
-    @AlienProvides
     fun providePlant(sun: Sun, water: Water): Plant {
         return Plant(sun, water)
     }
