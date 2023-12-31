@@ -7,8 +7,8 @@ import kotlin.reflect.KClass
 annotation class AlienProvides
 
 @Retention(AnnotationRetention.RUNTIME)
-@Target(AnnotationTarget.FUNCTION, AnnotationTarget.CONSTRUCTOR, AnnotationTarget.FIELD, AnnotationTarget.PROPERTY)
-annotation class AlienInject
+@Target(AnnotationTarget.CONSTRUCTOR)
+annotation class AlienConstruct
 
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.CLASS)

@@ -1,6 +1,8 @@
 package net.williamott.aliensampleproject.di
 
-class Sun {
+import net.williamott.alien.AlienConstruct
+
+class Sun @AlienConstruct constructor() {
     fun whoAmI(): String {
         return "I am the sun."
     }

@@ -13,10 +13,23 @@ class AlienSymbolProcessor(
     private val logger: KSPLogger
 ) : SymbolProcessor {
     private val moduleMap = mutableMapOf<ClassName, MutableMap<TypeName, ProviderData>>()
+    private val constructMap = mutableMapOf<ClassName, MutableMap<TypeName, ConstructData>>()
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        val symbols = resolver.getSymbolsWithAnnotation("net.williamott.alien.AlienMotherShip")
+        val componentSymbols = resolver.getSymbolsWithAnnotation("net.williamott.alien.AlienMotherShip")
         val moduleSymbols = resolver.getSymbolsWithAnnotation("net.williamott.alien.AlienModule")
+        val injectSymbols = resolver.getSymbolsWithAnnotation("net.williamott.alien.AlienConstruct")
+
+        injectSymbols.forEach { symbol ->
+            logger.warn("Found @AlienInject: $symbol")
+            symbol.accept(
+                ConstructSymbolVisitor(
+                    constructMap = constructMap,
+                    codeGenerator = codeGenerator,
+                    logger = logger
+                ), Unit
+            )
+        }
 
         moduleSymbols.forEach { symbol ->
             logger.warn("Found @AlienModule: $symbol")
@@ -29,7 +42,7 @@ class AlienSymbolProcessor(
             )
         }
 
-        symbols.forEach { symbol ->
+        componentSymbols.forEach { symbol ->
             logger.warn("Found @AlienMotherShip: $symbol")
             symbol.accept(
                 ComponentSymbolVisitor(
