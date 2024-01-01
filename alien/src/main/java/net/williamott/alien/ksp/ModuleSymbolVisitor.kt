@@ -42,7 +42,11 @@ class ModuleSymbolVisitor(
                 val returnType = functionDeclaration.returnType?.toTypeName()
                 val functionName = functionDeclaration.simpleName.getShortName()
                 logger.warn("returnType print: $returnType")
-                providerMap[returnType!!] = ProviderData(functionDeclaration, classDeclaration)
+                providerMap[returnType!!] = ProviderData(
+                    functionDeclaration = functionDeclaration,
+                    moduleClass = classDeclaration,
+                    constructClass = null
+                )
                 val className =
                     "${classDeclaration.toClassName().simpleName}_${functionName}Provider"
                 val moduleName = classDeclaration.toClassName()

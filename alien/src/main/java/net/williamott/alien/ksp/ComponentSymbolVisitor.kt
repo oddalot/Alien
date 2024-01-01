@@ -24,7 +24,7 @@ import net.williamott.alien.Provider
 
 class ComponentSymbolVisitor(
     private val moduleMap: Map<ClassName, MutableMap<TypeName, ProviderData>>,
-    private val constructMap: Map<TypeName, ConstructData>,
+    private val constructMap: Map<TypeName, ProviderData>,
     private val codeGenerator: CodeGenerator,
     private val logger: KSPLogger,
 ) : KSVisitorVoid() {
@@ -73,6 +73,10 @@ class ComponentSymbolVisitor(
             }
         }
 
+        constructMap.forEach { (typeName, functionDeclaration) ->
+            componentProviderMap[typeName] = functionDeclaration
+        }
+
         classDeclaration.getDeclaredFunctions().forEach { componentFunction ->
             val functionReturnType = componentFunction.returnType?.toTypeName()!!
             val functionName = componentFunction.simpleName.getShortName()
@@ -102,35 +106,62 @@ class ComponentSymbolVisitor(
         providerPrintSet.forEach { typeName ->
             logger.warn("ordered typeName: $typeName")
             componentProviderMap[typeName]?.let { providerData ->
-                val moduleName = providerData.moduleClass.toClassName().simpleName
-                val providerType = providerData.functionDeclaration.returnType?.toTypeName()!!
-                val functionName = providerData.functionDeclaration.simpleName.getShortName()
-                val classTypeName = Provider::class.asTypeName().plusParameter(providerType)
-                val classNameString = "${moduleName}_${functionName}Provider"
-                val tempName = functionName.replaceFirstChar { it.lowercaseChar() }
-                val providerName = "${tempName}Provider"
-                providerNameMap[typeName] = providerName
-                val expression = buildString {
-                    append(classNameString)
-                    append("(")
-                    append(moduleName.replaceFirstChar { it.lowercaseChar() })
-                    if (providerData.functionDeclaration.parameters.isNotEmpty()) {
-                        append(", ")
-                    }
-                    providerData.functionDeclaration.parameters.forEachIndexed { index, ksValueParameter ->
-                        val paramName = providerNameMap[ksValueParameter.type.toTypeName()]
-                        append(paramName)
-                        if (index != providerData.functionDeclaration.parameters.size - 1) {
+                if (providerData.moduleClass != null) {
+                    val moduleName = providerData.moduleClass.toClassName().simpleName
+                    val providerType = providerData.functionDeclaration.returnType?.toTypeName()!!
+                    val functionName = providerData.functionDeclaration.simpleName.getShortName()
+                    val classTypeName = Provider::class.asTypeName().plusParameter(providerType)
+                    val classNameString = "${moduleName}_${functionName}Provider"
+                    val tempName = functionName.replaceFirstChar { it.lowercaseChar() }
+                    val providerName = "${tempName}Provider"
+                    providerNameMap[typeName] = providerName
+                    val expression = buildString {
+                        append(classNameString)
+                        append("(")
+                        append(moduleName.replaceFirstChar { it.lowercaseChar() })
+                        if (providerData.functionDeclaration.parameters.isNotEmpty()) {
                             append(", ")
                         }
+                        providerData.functionDeclaration.parameters.forEachIndexed { index, ksValueParameter ->
+                            val paramName = providerNameMap[ksValueParameter.type.toTypeName()]
+                            append(paramName)
+                            if (index != providerData.functionDeclaration.parameters.size - 1) {
+                                append(", ")
+                            }
+                        }
+                        append(")")
                     }
-                    append(")")
-                }
 
-                propertySpecs += PropertySpec.builder(
-                    providerName, classTypeName
-                ).initializer(expression)
-                    .build()
+                    propertySpecs += PropertySpec.builder(
+                        providerName, classTypeName
+                    ).initializer(expression)
+                        .build()
+                } else if (providerData.constructClass != null) {
+                    val constructorName = providerData.constructClass.simpleName.getShortName()
+                    val providerType = providerData.functionDeclaration.returnType?.toTypeName()!!
+                    val classTypeName = Provider::class.asTypeName().plusParameter(providerType)
+                    val classNameString = "Construct_${constructorName}Provider"
+                    val tempName = constructorName.replaceFirstChar { it.lowercaseChar() }
+                    val providerName = "${tempName}Provider"
+                    providerNameMap[typeName] = providerName
+                    val expression = buildString {
+                        append(classNameString)
+                        append("(")
+                        providerData.functionDeclaration.parameters.forEachIndexed { index, ksValueParameter ->
+                            val paramName = providerNameMap[ksValueParameter.type.toTypeName()]
+                            append(paramName)
+                            if (index != providerData.functionDeclaration.parameters.size - 1) {
+                                append(", ")
+                            }
+                        }
+                        append(")")
+                    }
+
+                    propertySpecs += PropertySpec.builder(
+                        providerName, classTypeName
+                    ).initializer(expression)
+                        .build()
+                }
             }
         }
 
