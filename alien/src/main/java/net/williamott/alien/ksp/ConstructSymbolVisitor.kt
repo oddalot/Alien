@@ -2,6 +2,7 @@ package net.williamott.alien.ksp
 
 import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.isAnnotationPresent
+import com.google.devtools.ksp.isConstructor
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.symbol.KSClassDeclaration
@@ -23,6 +24,7 @@ import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.writeTo
 import net.williamott.alien.AlienConstruct
 import net.williamott.alien.Provider
+import java.util.concurrent.ExecutionException
 
 
 class ConstructSymbolVisitor(
@@ -34,6 +36,7 @@ class ConstructSymbolVisitor(
     @OptIn(KspExperimental::class, KotlinPoetKspPreview::class)
     override fun visitFunctionDeclaration(function: KSFunctionDeclaration, data: Unit) {
         if (!function.isAnnotationPresent(AlienConstruct::class)) return
+        if (!function.isConstructor()) throw IllegalStateException("@AlienConstruct can only be applied to a Class constructor")
         val packageName = function.containingFile?.packageName?.asString()
         val returnType = function.returnType?.toTypeName()!!
         logger.warn("returnType print: $returnType")

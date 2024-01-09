@@ -4,6 +4,7 @@ import com.tschuchort.compiletesting.KotlinCompilation
 import com.tschuchort.compiletesting.SourceFile
 import com.tschuchort.compiletesting.symbolProcessorProviders
 import junit.framework.TestCase.assertEquals
+import junit.framework.TestCase.assertTrue
 import net.williamott.alien.ksp.AlienSymbolProcessorProvider
 import org.junit.Rule
 import org.junit.Test
@@ -14,6 +15,39 @@ import java.io.FileNotFoundException
 class AlienProcessorTest {
     @get:Rule
     val temporaryFolder: TemporaryFolder = TemporaryFolder()
+
+    @Test
+    fun `test @AlienConstruct on module function throws exception`() {
+        val kotlinSource = SourceFile.kotlin(
+            "file1.kt", """
+        package net.williamott.alien
+
+        class Sun {
+            fun whoAmI() {
+                println("I am the sun.")
+            }
+        }
+
+        @AlienModule
+        class Module1 {
+            @AlienConstruct
+            fun provideSun(): Sun {
+                return Sun()
+            }
+        }
+
+        @AlienMotherShip(modules = [Module1::class])
+        interface GalaxyShip {
+            fun getSun(): Sun
+        }
+        """
+        )
+
+        val compilationResult = compile(kotlinSource)
+
+        assertEquals(KotlinCompilation.ExitCode.COMPILATION_ERROR, compilationResult.exitCode)
+        assertTrue(compilationResult.messages.contains("@AlienConstruct can only be applied to a Class constructor"))
+    }
 
     @Test
     fun `test MotherShip with single Module generates file correctly`() {
