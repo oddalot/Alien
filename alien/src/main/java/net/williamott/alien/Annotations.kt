@@ -7,6 +7,10 @@ import kotlin.reflect.KClass
 annotation class AlienProvides
 
 @Retention(AnnotationRetention.RUNTIME)
+@Target(AnnotationTarget.FUNCTION)
+annotation class AlienSingleton
+
+@Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.CONSTRUCTOR)
 annotation class AlienConstruct
 
