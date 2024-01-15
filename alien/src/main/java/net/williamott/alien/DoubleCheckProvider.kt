@@ -8,15 +8,8 @@ class DoubleCheckProvider<T>(
     private var INSTANCE: T? = null
 
     override fun get(): T {
-        return if (INSTANCE == null) {
-            synchronized(this) {
-                if (INSTANCE == null) {
-                    INSTANCE = provider.get()
-                }
-                INSTANCE!!
-            }
-        } else {
-            INSTANCE!!
+        return INSTANCE ?: synchronized(this) {
+            INSTANCE ?: provider.get().also { INSTANCE = it }
         }
     }
 }
