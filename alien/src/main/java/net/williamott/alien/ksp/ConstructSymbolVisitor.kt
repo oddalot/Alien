@@ -23,6 +23,7 @@ import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.writeTo
 import net.williamott.alien.AlienConstruct
+import net.williamott.alien.AlienSingleton
 import net.williamott.alien.Provider
 import java.util.concurrent.ExecutionException
 
@@ -43,8 +44,9 @@ class ConstructSymbolVisitor(
         val constructClass = (function.parent as KSClassDeclaration)
         val typeName = constructClass.toClassName().simpleName
         val className = "Construct_${typeName}Provider"
+        val isScoped = function.isAnnotationPresent(AlienSingleton::class)
 
-        constructMap[returnType] = ProviderData(functionDeclaration = function, moduleClass = null, constructClass = constructClass)
+        constructMap[returnType] = ProviderData(functionDeclaration = function, moduleClass = null, constructClass = constructClass, isScoped = isScoped)
 
         val file = FileSpec.builder(packageName!!, className)
             .addType(

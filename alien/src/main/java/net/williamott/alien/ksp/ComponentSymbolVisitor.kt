@@ -20,6 +20,7 @@ import com.squareup.kotlinpoet.ksp.addOriginatingKSFile
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.writeTo
+import net.williamott.alien.DoubleCheckProvider
 import net.williamott.alien.Provider
 
 class ComponentSymbolVisitor(
@@ -28,6 +29,8 @@ class ComponentSymbolVisitor(
     private val codeGenerator: CodeGenerator,
     private val logger: KSPLogger,
 ) : KSVisitorVoid() {
+    var hasScopedProvider = false
+
     override fun visitClassDeclaration(classDeclaration: KSClassDeclaration, data: Unit) {
         buildComponent(classDeclaration)
     }
@@ -45,8 +48,16 @@ class ComponentSymbolVisitor(
                     .buildProviderData(classDeclaration)
                     .build()
             )
+            .addDoubleCheckImport()
             .build()
         file.writeTo(codeGenerator = codeGenerator, aggregating = false)
+    }
+
+    private fun FileSpec.Builder.addDoubleCheckImport(): FileSpec.Builder {
+        if (hasScopedProvider) {
+            addImport(DoubleCheckProvider::class.java.`package`.name, "DoubleCheckProvider")
+        }
+        return this
     }
 
     @OptIn(KotlinPoetKspPreview::class)
@@ -116,6 +127,10 @@ class ComponentSymbolVisitor(
                     val providerName = "${tempName}Provider"
                     providerNameMap[typeName] = providerName
                     val expression = buildString {
+                        if (providerData.isScoped) {
+                            hasScopedProvider = true
+                            append("DoubleCheckProvider(")
+                        }
                         append(classNameString)
                         append("(")
                         append(moduleName.replaceFirstChar { it.lowercaseChar() })
@@ -130,6 +145,7 @@ class ComponentSymbolVisitor(
                             }
                         }
                         append(")")
+                        if (providerData.isScoped) append(")")
                     }
 
                     propertySpecs += PropertySpec.builder(
@@ -145,6 +161,10 @@ class ComponentSymbolVisitor(
                     val providerName = "${tempName}Provider"
                     providerNameMap[typeName] = providerName
                     val expression = buildString {
+                        if (providerData.isScoped) {
+                            hasScopedProvider = true
+                            append("DoubleCheckProvider(")
+                        }
                         append(classNameString)
                         append("(")
                         providerData.functionDeclaration.parameters.forEachIndexed { index, ksValueParameter ->
@@ -155,6 +175,7 @@ class ComponentSymbolVisitor(
                             }
                         }
                         append(")")
+                        if (providerData.isScoped) append(")")
                     }
 
                     propertySpecs += PropertySpec.builder(

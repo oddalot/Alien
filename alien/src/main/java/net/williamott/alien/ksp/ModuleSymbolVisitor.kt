@@ -23,6 +23,7 @@ import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.writeTo
 import net.williamott.alien.AlienProvides
+import net.williamott.alien.AlienSingleton
 import net.williamott.alien.Provider
 
 
@@ -41,11 +42,13 @@ class ModuleSymbolVisitor(
                 val packageName = classDeclaration.containingFile?.packageName?.asString()
                 val returnType = functionDeclaration.returnType?.toTypeName()
                 val functionName = functionDeclaration.simpleName.getShortName()
+                val isScoped = functionDeclaration.isAnnotationPresent(AlienSingleton::class)
                 logger.warn("returnType print: $returnType")
                 providerMap[returnType!!] = ProviderData(
                     functionDeclaration = functionDeclaration,
                     moduleClass = classDeclaration,
-                    constructClass = null
+                    constructClass = null,
+                    isScoped = isScoped
                 )
                 val className =
                     "${classDeclaration.toClassName().simpleName}_${functionName}Provider"

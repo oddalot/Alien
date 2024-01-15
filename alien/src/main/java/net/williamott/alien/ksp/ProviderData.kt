@@ -7,5 +7,6 @@ import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 data class ProviderData(
     val functionDeclaration: KSFunctionDeclaration,
     val moduleClass: KSClassDeclaration?,
-    val constructClass: KSClassDeclaration?
+    val constructClass: KSClassDeclaration?,
+    val isScoped: Boolean
 )
