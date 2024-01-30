@@ -8,5 +8,6 @@ data class ProviderData(
     val functionDeclaration: KSFunctionDeclaration,
     val moduleClass: KSClassDeclaration?,
     val constructClass: KSClassDeclaration?,
+    val bindsData: BindsData?,
     val isScoped: Boolean
 )

@@ -15,7 +15,7 @@ class Water {
 }
 
 
-class Animal(private val plant: Plant) {
+class Animal @AlienConstruct constructor(private val plant: Plant): Beast {
     fun whoAmI(): String {
         return plant.whoAmI() + "I am an animal."
     }
@@ -26,3 +26,5 @@ class Plant @AlienConstruct constructor(private val sun: Sun, private val water:
         return  sun.whoAmI() + water.whoAmI() + "I am a plant."
     }
 }
+
+interface Beast

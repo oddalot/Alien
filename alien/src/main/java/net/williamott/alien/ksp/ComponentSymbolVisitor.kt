@@ -26,10 +26,11 @@ import net.williamott.alien.Provider
 class ComponentSymbolVisitor(
     private val moduleMap: Map<ClassName, MutableMap<TypeName, ProviderData>>,
     private val constructMap: Map<TypeName, ProviderData>,
+    private val bindsMap: MutableMap<TypeName, BindsData>,
     private val codeGenerator: CodeGenerator,
     private val logger: KSPLogger,
 ) : KSVisitorVoid() {
-    var hasScopedProvider = false
+    private var hasScopedProvider = false
 
     override fun visitClassDeclaration(classDeclaration: KSClassDeclaration, data: Unit) {
         buildComponent(classDeclaration)
@@ -84,8 +85,19 @@ class ComponentSymbolVisitor(
             }
         }
 
-        constructMap.forEach { (typeName, functionDeclaration) ->
-            componentProviderMap[typeName] = functionDeclaration
+        constructMap.forEach { (typeName, providerData) ->
+            componentProviderMap[typeName] = providerData
+        }
+
+        bindsMap.forEach { (typeName, bindsData) ->
+            logger.warn("adding BindsData")
+            val implClass = bindsData.bindsFunction.parameters.first().type.toTypeName()
+            val foundProviderData =
+                componentProviderMap[implClass]
+            if (foundProviderData != null) {
+                logger.warn("adding BindsData: not null")
+                componentProviderMap[typeName] = foundProviderData.copy(bindsData = bindsData)
+            }
         }
 
         classDeclaration.getDeclaredFunctions().forEach { componentFunction ->
@@ -119,11 +131,20 @@ class ComponentSymbolVisitor(
             componentProviderMap[typeName]?.let { providerData ->
                 if (providerData.moduleClass != null) {
                     val moduleName = providerData.moduleClass.toClassName().simpleName
-                    val providerType = providerData.functionDeclaration.returnType?.toTypeName()!!
+                    val providerType = if (providerData.bindsData == null) {
+                        providerData.functionDeclaration.returnType?.toTypeName()!!
+                    } else {
+                        providerData.bindsData.bindsFunction.returnType?.toTypeName()!!
+                    }
                     val functionName = providerData.functionDeclaration.simpleName.getShortName()
                     val classTypeName = Provider::class.asTypeName().plusParameter(providerType)
                     val classNameString = "${moduleName}_${functionName}Provider"
-                    val tempName = functionName.replaceFirstChar { it.lowercaseChar() }
+                    val tempName = if (providerData.bindsData == null) {
+                        functionName.replaceFirstChar { it.lowercaseChar() }
+                    } else {
+                        providerData.bindsData.bindsFunction.simpleName.getShortName()
+                            .replaceFirstChar { it.lowercaseChar() }
+                    }
                     val providerName = "${tempName}Provider"
                     providerNameMap[typeName] = providerName
                     val expression = buildString {
@@ -154,10 +175,19 @@ class ComponentSymbolVisitor(
                         .build()
                 } else if (providerData.constructClass != null) {
                     val constructorName = providerData.constructClass.simpleName.getShortName()
-                    val providerType = providerData.functionDeclaration.returnType?.toTypeName()!!
+                    val providerType = if (providerData.bindsData == null) {
+                        providerData.functionDeclaration.returnType?.toTypeName()!!
+                    } else {
+                        providerData.bindsData.bindsFunction.returnType?.toTypeName()!!
+                    }
                     val classTypeName = Provider::class.asTypeName().plusParameter(providerType)
                     val classNameString = "Construct_${constructorName}Provider"
-                    val tempName = constructorName.replaceFirstChar { it.lowercaseChar() }
+                    val tempName = if (providerData.bindsData == null) {
+                        constructorName.replaceFirstChar { it.lowercaseChar() }
+                    } else {
+                        providerData.bindsData.bindsFunction.simpleName.getShortName()
+                            .replaceFirstChar { it.lowercaseChar() }
+                    }
                     val providerName = "${tempName}Provider"
                     providerNameMap[typeName] = providerName
                     val expression = buildString {

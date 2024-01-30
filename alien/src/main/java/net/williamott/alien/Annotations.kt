@@ -8,6 +8,10 @@ annotation class AlienProvides
 
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.FUNCTION)
+annotation class AlienBinds
+
+@Retention(AnnotationRetention.RUNTIME)
+@Target(AnnotationTarget.FUNCTION)
 annotation class AlienSingleton
 
 @Retention(AnnotationRetention.RUNTIME)

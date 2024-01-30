@@ -17,7 +17,7 @@ import net.williamott.aliensampleproject.ui.theme.AlienSampleProjectTheme
 class MainActivity : ComponentActivity() {
     private val motherShip = AlienPlanetShip()
     private val animal = motherShip.getAnimal()
-    private val water = motherShip.getWater()
+    private val beast = motherShip.getBeast()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,7 +30,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     Column {
                         Greeting(animal.whoAmI())
-                        Greeting(water.whoAmI())
+                        Greeting(beast.toString())
                     }
                 }
             }

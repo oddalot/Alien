@@ -14,6 +14,7 @@ class AlienSymbolProcessor(
 ) : SymbolProcessor {
     private val moduleMap = mutableMapOf<ClassName, MutableMap<TypeName, ProviderData>>()
     private val constructMap = mutableMapOf<TypeName, ProviderData>()
+    private val bindsMap = mutableMapOf<TypeName, BindsData>()
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val componentSymbols = resolver.getSymbolsWithAnnotation("net.williamott.alien.AlienMotherShip")
@@ -36,6 +37,7 @@ class AlienSymbolProcessor(
             symbol.accept(
                 ModuleSymbolVisitor(
                     moduleMap = moduleMap,
+                    bindsMap = bindsMap,
                     codeGenerator = codeGenerator,
                     logger = logger
                 ), Unit
@@ -48,6 +50,7 @@ class AlienSymbolProcessor(
                 ComponentSymbolVisitor(
                     moduleMap = moduleMap,
                     constructMap = constructMap,
+                    bindsMap = bindsMap,
                     codeGenerator = codeGenerator,
                     logger = logger
                 ), Unit

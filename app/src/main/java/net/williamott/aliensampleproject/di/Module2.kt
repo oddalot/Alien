@@ -9,9 +9,4 @@ class Module2 {
     fun provideWater(): Water {
         return Water()
     }
-
-    @AlienProvides
-    fun provideAnimal(plant: Plant): Animal {
-        return Animal(plant)
-    }
 }
