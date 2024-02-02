@@ -96,7 +96,7 @@ class ComponentSymbolVisitor(
                 componentProviderMap[implClass]
             if (foundProviderData != null) {
                 logger.warn("adding BindsData: not null")
-                componentProviderMap[typeName] = foundProviderData.copy(bindsData = bindsData)
+                componentProviderMap[typeName] = foundProviderData.copy(bindsData = bindsData, isScoped = bindsData.isScoped)
             }
         }
 
