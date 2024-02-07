@@ -28,7 +28,6 @@ import net.williamott.alien.AlienProvides
 import net.williamott.alien.AlienSingleton
 import net.williamott.alien.Provider
 
-
 class ModuleSymbolVisitor(
     private val moduleMap: MutableMap<ClassName, MutableMap<TypeName, ProviderData>>,
     private val bindsMap: MutableMap<TypeName, BindsData>,
@@ -39,70 +38,86 @@ class ModuleSymbolVisitor(
     override fun visitClassDeclaration(classDeclaration: KSClassDeclaration, data: Unit) {
         val providerMap = mutableMapOf<TypeName, ProviderData>()
         moduleMap[classDeclaration.toClassName()] = providerMap
-        classDeclaration.getDeclaredFunctions()
-            .filter { it.isAnnotationPresent(AlienBinds::class) }.forEach { function ->
-                if (classDeclaration.classKind != ClassKind.INTERFACE) {
-                    throw IllegalStateException("AlienBinds annotation can only be used on an Interface function")
-                }
-                logger.warn("found Binding: $function")
-                val returnType = function.returnType?.toTypeName()!!
-                val isScoped = function.isAnnotationPresent(AlienSingleton::class)
-                if (bindsMap.containsKey(returnType)) {
-                    throw IllegalStateException("Cannot bind the same Type more than once")
-                }
-                bindsMap[returnType] = BindsData(bindsFunction = function, isScoped = isScoped)
+        classDeclaration.getDeclaredFunctions().forEach { function ->
+            if (function.isAnnotationPresent(AlienBinds::class)) {
+                addBindsData(classDeclaration, function)
             }
 
-        classDeclaration.getDeclaredFunctions()
-            .filter { it.isAnnotationPresent(AlienProvides::class) }
-            .forEach { functionDeclaration ->
-                val packageName = classDeclaration.containingFile?.packageName?.asString()
-                val returnType = functionDeclaration.returnType?.toTypeName()
-                val functionName = functionDeclaration.simpleName.getShortName()
-                val isScoped = functionDeclaration.isAnnotationPresent(AlienSingleton::class)
-                logger.warn("returnType print: $returnType")
-                providerMap[returnType!!] = ProviderData(
-                    functionDeclaration = functionDeclaration,
-                    moduleClass = classDeclaration,
-                    constructClass = null,
-                    bindsData = null,
-                    isScoped = isScoped
-                )
-                val className =
-                    "${classDeclaration.toClassName().simpleName}_${functionName}Provider"
-                val moduleName = classDeclaration.toClassName()
-                val moduleNameLowerCase = moduleName.toString().substringAfterLast(".")
-                    .replaceFirstChar { it.lowercaseChar() }
+            if (function.isAnnotationPresent(AlienProvides::class)) {
+                addProviderData(classDeclaration, function, providerMap)
+            }
+        }
+    }
 
-                val file = FileSpec.builder(packageName!!, className)
-                    .addType(
-                        TypeSpec.classBuilder(className)
-                            .addOriginatingKSFile(classDeclaration.containingFile!!)
-                            .primaryConstructor(
-                                FunSpec.constructorBuilder().addAllParameters(
-                                    moduleNameLowerCase,
-                                    moduleName,
-                                    functionDeclaration
-                                ).build()
-                            )
-                            .addSuperinterface(
-                                Provider::class.asTypeName().plusParameter(returnType)
-                            )
-                            .addAllProperties(
-                                moduleNameLowerCase,
-                                moduleName,
-                                functionDeclaration
-                            )
-                            .addModuleGetFunction(
-                                returnType,
-                                moduleNameLowerCase,
-                                functionDeclaration
-                            )
-                            .build()
+    @OptIn(KotlinPoetKspPreview::class, KspExperimental::class)
+    private fun addBindsData(
+        classDeclaration: KSClassDeclaration,
+        function: KSFunctionDeclaration
+    ) {
+        if (classDeclaration.classKind != ClassKind.INTERFACE) {
+            throw IllegalStateException("AlienBinds annotation can only be used on an Interface function")
+        }
+        logger.warn("found Binding: $function")
+        val returnType = function.returnType?.toTypeName()!!
+        val isScoped = function.isAnnotationPresent(AlienSingleton::class)
+        if (bindsMap.containsKey(returnType)) {
+            throw IllegalStateException("Cannot bind the same Type more than once")
+        }
+        bindsMap[returnType] = BindsData(bindsFunction = function, isScoped = isScoped)
+    }
+
+    @OptIn(KotlinPoetKspPreview::class, KspExperimental::class)
+    private fun addProviderData(
+        classDeclaration: KSClassDeclaration,
+        functionDeclaration: KSFunctionDeclaration,
+        providerMap: MutableMap<TypeName, ProviderData>
+    ) {
+        val packageName = classDeclaration.containingFile?.packageName?.asString()
+        val returnType = functionDeclaration.returnType?.toTypeName()
+        val functionName = functionDeclaration.simpleName.getShortName()
+        val isScoped = functionDeclaration.isAnnotationPresent(AlienSingleton::class)
+        logger.warn("returnType print: $returnType")
+        providerMap[returnType!!] = ProviderData(
+            functionDeclaration = functionDeclaration,
+            moduleClass = classDeclaration,
+            constructClass = null,
+            bindsData = null,
+            isScoped = isScoped
+        )
+        val className =
+            "${classDeclaration.toClassName().simpleName}_${functionName}Provider"
+        val moduleName = classDeclaration.toClassName()
+        val moduleNameLowerCase = moduleName.toString().substringAfterLast(".")
+            .replaceFirstChar { it.lowercaseChar() }
+
+        val file = FileSpec.builder(packageName!!, className)
+            .addType(
+                TypeSpec.classBuilder(className)
+                    .addOriginatingKSFile(classDeclaration.containingFile!!)
+                    .primaryConstructor(
+                        FunSpec.constructorBuilder().addAllParameters(
+                            moduleNameLowerCase,
+                            moduleName,
+                            functionDeclaration
+                        ).build()
+                    )
+                    .addSuperinterface(
+                        Provider::class.asTypeName().plusParameter(returnType)
+                    )
+                    .addAllProperties(
+                        moduleNameLowerCase,
+                        moduleName,
+                        functionDeclaration
+                    )
+                    .addModuleGetFunction(
+                        returnType,
+                        moduleNameLowerCase,
+                        functionDeclaration
                     )
                     .build()
-                file.writeTo(codeGenerator = codeGenerator, aggregating = false)
-            }
+            )
+            .build()
+        file.writeTo(codeGenerator = codeGenerator, aggregating = false)
     }
 
 
