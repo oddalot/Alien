@@ -27,6 +27,7 @@ class ComponentSymbolVisitor(
     private val moduleMap: Map<ClassName, MutableMap<TypeName, ProviderData>>,
     private val constructMap: Map<TypeName, ProviderData>,
     private val bindsMap: MutableMap<TypeName, BindsData>,
+    private val injectMap: MutableMap<ClassName, InjectData>,
     private val codeGenerator: CodeGenerator,
     private val logger: KSPLogger,
 ) : KSVisitorVoid() {
@@ -69,6 +70,7 @@ class ComponentSymbolVisitor(
         val modulePrintSet = linkedSetOf<KSClassDeclaration>()
         val providerPrintSet = linkedSetOf<TypeName>()
         val functionPrintSet = linkedSetOf<ProviderFunctionData>()
+        val injectPrintSet = linkedSetOf<InjectPrintData>()
         val componentProviderMap = mutableMapOf<TypeName, ProviderData>()
 
         classDeclaration.annotations.forEach {
@@ -103,18 +105,39 @@ class ComponentSymbolVisitor(
         classDeclaration.getDeclaredFunctions().forEach { componentFunction ->
             val functionReturnType = componentFunction.returnType?.toTypeName()!!
             val functionName = componentFunction.simpleName.getShortName()
-            functionPrintSet.add(
-                ProviderFunctionData(
-                    functionName,
-                    functionReturnType
+            if (functionName == "inject") {
+                val implParameterName = componentFunction.parameters.first().name?.getShortName()!!
+                val implClass = componentFunction.parameters.first().type.toTypeName()
+                val injectData = injectMap[implClass]!!
+                injectPrintSet.add(
+                    InjectPrintData(
+                        implParameterName = implParameterName,
+                        implClass = implClass,
+                        memberClasses = injectData.memberClasses
+                    )
                 )
-            )
-            recurseThroughParams(
-                functionReturnType,
-                modulePrintSet,
-                providerPrintSet,
-                componentProviderMap
-            )
+                injectData.memberClasses.forEach { memberInjectData ->
+                    recurseThroughParams(
+                        memberInjectData.memberTypeName,
+                        modulePrintSet,
+                        providerPrintSet,
+                        componentProviderMap
+                    )
+                }
+            } else {
+                functionPrintSet.add(
+                    ProviderFunctionData(
+                        functionName,
+                        functionReturnType
+                    )
+                )
+                recurseThroughParams(
+                    functionReturnType,
+                    modulePrintSet,
+                    providerPrintSet,
+                    componentProviderMap
+                )
+            }
         }
 
         modulePrintSet.forEach { moduleClassDeclaration ->
@@ -221,6 +244,20 @@ class ComponentSymbolVisitor(
             funSpecs += FunSpec.builder(functionName).returns(typeName).addStatement(
                 "return ${providerName}.get()"
             ).addModifiers(KModifier.OVERRIDE).build()
+        }
+
+        injectPrintSet.forEach { injectPrintData ->
+            val implClass = injectPrintData.implClass
+            val implParameterName = injectPrintData.implParameterName
+            val expression = buildString {
+                injectPrintData.memberClasses.forEach { memberInjectData ->
+                    val providerName = providerNameMap[memberInjectData.memberTypeName]
+                    appendLine("${implParameterName}.${memberInjectData.paramName} = ${providerName}.get()")
+                }
+            }
+            funSpecs += FunSpec.builder("inject").addStatement(
+                expression
+            ).addParameter(name = implParameterName, type = implClass).addModifiers(KModifier.OVERRIDE).build()
         }
 
         return this

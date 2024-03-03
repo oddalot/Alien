@@ -25,3 +25,9 @@ annotation class AlienMotherShip(val modules: Array<KClass<*>> = [])
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.CLASS)
 annotation class AlienModule
+
+
+@Retention(AnnotationRetention.RUNTIME)
+@Target(AnnotationTarget.PROPERTY)
+annotation class AlienInject
+

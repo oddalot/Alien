@@ -11,16 +11,27 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import net.williamott.alien.AlienInject
 import net.williamott.aliensampleproject.di.AlienPlanetShip
+import net.williamott.aliensampleproject.di.Animal
+import net.williamott.aliensampleproject.di.Beast
+import net.williamott.aliensampleproject.di.Plant
 import net.williamott.aliensampleproject.ui.theme.AlienSampleProjectTheme
+
 
 class MainActivity : ComponentActivity() {
     private val motherShip = AlienPlanetShip()
     private val animal = motherShip.getAnimal()
-    private val beast = motherShip.getBeast()
+
+    @AlienInject
+    lateinit var plant: Plant
+
+    @AlienInject
+    lateinit var beast: Beast
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        motherShip.inject(this)
         setContent {
             AlienSampleProjectTheme {
                 // A surface container using the 'background' color from the theme
@@ -30,7 +41,8 @@ class MainActivity : ComponentActivity() {
                 ) {
                     Column {
                         Greeting(animal.whoAmI())
-                        Greeting(beast.toString())
+                        Greeting((beast as Animal).whoAmI())
+                        Greeting(plant.whoAmI())
                     }
                 }
             }

@@ -1,6 +1,6 @@
 plugins {
     kotlin("jvm")
-    id("com.vanniktech.maven.publish") version "0.25.3"
+    id("com.vanniktech.maven.publish") version "0.27.0"
 }
 
 java {
@@ -19,12 +19,21 @@ dependencies {
 }
 
 group = "net.williamott"
-version = "0.1"
+version = "0.2"
+
+publishing {
+    repositories {
+        maven {
+            url = uri(layout.buildDirectory.dir("repo"))
+        }
+    }
+}
 
 mavenPublishing {
+    signAllPublications()
     publishToMavenCentral(com.vanniktech.maven.publish.SonatypeHost.S01)
 
-    coordinates("net.williamott", "alien", "0.1")
+    coordinates("net.williamott", "alien", "0.2")
 
     pom {
         name.set("Alien Dependency Injection")
