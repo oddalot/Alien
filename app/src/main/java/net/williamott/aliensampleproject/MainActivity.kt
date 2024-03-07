@@ -26,8 +26,6 @@ class MainActivity : ComponentActivity() {
     @AlienInject
     lateinit var plant: Plant
 
-    @AlienInject
-    lateinit var beast: Beast
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,7 +39,6 @@ class MainActivity : ComponentActivity() {
                 ) {
                     Column {
                         Greeting(animal.whoAmI())
-                        Greeting((beast as Animal).whoAmI())
                         Greeting(plant.whoAmI())
                     }
                 }

@@ -117,7 +117,7 @@ class ModuleSymbolVisitor(
                     .build()
             )
             .build()
-        file.writeTo(codeGenerator = codeGenerator, aggregating = false)
+        file.writeTo(codeGenerator = codeGenerator, aggregating = true)
     }
 
 

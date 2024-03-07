@@ -2,6 +2,7 @@ package net.williamott.alien.ksp
 
 import com.google.devtools.ksp.getDeclaredFunctions
 import com.google.devtools.ksp.processing.CodeGenerator
+import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSType
@@ -52,7 +53,7 @@ class ComponentSymbolVisitor(
             )
             .addDoubleCheckImport()
             .build()
-        file.writeTo(codeGenerator = codeGenerator, aggregating = false)
+        file.writeTo(codeGenerator = codeGenerator, aggregating = true)
     }
 
     private fun FileSpec.Builder.addDoubleCheckImport(): FileSpec.Builder {
@@ -109,6 +110,8 @@ class ComponentSymbolVisitor(
                 val implParameterName = componentFunction.parameters.first().name?.getShortName()!!
                 val implClass = componentFunction.parameters.first().type.toTypeName()
                 val injectData = injectMap[implClass]!!
+                logger.warn("injectFile: ${injectData.implFile}")
+                addOriginatingKSFile(injectData.implFile)
                 injectPrintSet.add(
                     InjectPrintData(
                         implParameterName = implParameterName,

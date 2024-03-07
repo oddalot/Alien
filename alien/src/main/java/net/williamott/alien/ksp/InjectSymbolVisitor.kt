@@ -19,7 +19,7 @@ class InjectSymbolVisitor(
         val propertyParentClass = (property.parent as KSClassDeclaration).toClassName()
         val propertyName = property.simpleName.getShortName()
         val propertyTypeName = property.type.toTypeName()
-        val injectData = injectMap.getOrPut(propertyParentClass) { InjectData(propertyParentClass, memberClasses = listOf()) }
+        val injectData = injectMap.getOrPut(propertyParentClass) { InjectData(property.containingFile!!, propertyParentClass, memberClasses = listOf()) }
         injectMap[propertyParentClass] = injectData.copy(memberClasses = injectData.memberClasses + MemberInjectData(propertyName, propertyTypeName))
     }
 }

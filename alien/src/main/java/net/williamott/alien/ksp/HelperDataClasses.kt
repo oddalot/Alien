@@ -1,6 +1,7 @@
 package net.williamott.alien.ksp
 
 import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.TypeName
@@ -19,6 +20,7 @@ data class BindsData(
 )
 
 data class InjectData(
+    val implFile: KSFile,
     val implClass: ClassName,
     val memberClasses: List<MemberInjectData>
 )
